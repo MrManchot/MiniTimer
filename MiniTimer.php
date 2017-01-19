@@ -41,24 +41,29 @@ class MiniTimer {
         }
     }
 
-    public function display()
+    public function display($min = 0)
     {
-        echo '<style>.minitimer_table td { padding: 5px;  border:1px solid #ccc; }</style>'.$this->displayTimers().$this->displayPoints();
+        echo '<style>.minitimer_table td { padding: 5px;  border:1px solid #ccc; }</style>'.
+             '<table class="minitimer_table">'.
+             $this->displayTimers().$this->displayPoints().
+            '</table>';
     }
 
-    private function displayTimers() {
+    private function displayTimers($min) {
         if(empty($this->timers))
             return false;
 
         uasort($this->timers, function($a, $b) { return $a['time'] < $b['time']; });
         $tableRow = '';
         foreach($this->timers as $key => $timer) {
-            $tableRow .= '<tr><td>'.$key.'</td><td>'.self::formatTime($timer['time']).'</td></tr>';
+            if($timer['time'] >= $min) {
+                $tableRow .= '<tr><td>'.$key.'</td><td>'.self::formatTime($timer['time']).'</td></tr>';
+            }
         }
-        return '<table class="table">'.$tableRow.'</table>';
+        return $tableRow;
     }
 
-    private function displayPoints() {
+    private function displayPoints($min) {
         if(empty($this->points))
             return false;
 
@@ -69,14 +74,16 @@ class MiniTimer {
                 $isFirst = false;
             } else {
                 $time = $last_point['time'] - $point['time'];
-                $tableRow .= '<tr>
-                    <td>'.$last_point['backtrace'][0]['file'].' '.$last_point['backtrace'][0]['line'].'</td>
-                    <td>'.$point['backtrace'][0]['file'].' '.$point['backtrace'][0]['line'].'</td>
-                    <td>'.self::formatTime($time).'</td>
-                </tr>';
+                if($time >= $min) {
+                    $tableRow .= '<tr>
+                        <td>'.$last_point['backtrace'][0]['file'].' '.$last_point['backtrace'][0]['line'].'</td>
+                        <td>'.$point['backtrace'][0]['file'].' '.$point['backtrace'][0]['line'].'</td>
+                        <td>'.self::formatTime($time).'</td>
+                    </tr>';
+                }
             }
             $last_point = $point;
         }
-        return '<table class="minitimer_table">'.$tableRow.'</table>';
+        return $tableRow;
     }
 }
