@@ -4,6 +4,7 @@
   "keywords": [
     "php", "performance", "profile", "profiler", "debugging"
   ],
+  "license": "MIT",
   "authors": [
     {
       "name": "Cédric Mouleyre",
