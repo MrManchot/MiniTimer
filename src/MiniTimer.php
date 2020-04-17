@@ -40,8 +40,8 @@ class MiniTimer
 
     private function formatTime($time)
     {
-        if ($time > 0.1) {
-            return round($time, 2) . ' s';
+        if ($time > 1) {
+            return round($time, 3) . ' s';
         } else {
             return round($time * 1000) . ' ms';
         }
