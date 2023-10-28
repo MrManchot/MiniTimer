@@ -3,59 +3,44 @@
 class MiniTimer
 {
 
-    private static $miniTimer;
-    public $timers = array();
-    public $points = array();
+    private array $timers = [];
+    private array $points = [];
+    private const CSS_STYLES = '<style>
+        .minitimer_table { border-collapse:collapse; margin:20px 0; }
+        .minitimer_table td { padding: 7px 15px;  border:1px solid #ccc; }
+        .minitimer_table small { color: #666; }
+        .minitimer_table .time { text-align:right; }
+    </style>';
 
-    public function start($key)
+    public function start(string $key): void
     {
         if (!array_key_exists($key, $this->timers)) {
-            $this->timers[$key] = array();
-            $this->timers[$key]['time'] = 0;
+            $this->timers[$key] = ['time' => 0];
         }
         $this->timers[$key]['start'] = microtime(true);
     }
 
-    public function stop($key)
+    public function stop(string $key): void
     {
         $this->timers[$key]['time'] += microtime(true) - $this->timers[$key]['start'];
     }
 
-    public function addPoint()
+    public function addPoint(): void
     {
-        $this->points[] = array(
+        $this->points[] = [
             'time' => microtime(true),
             'backtrace' => debug_backtrace()
-        );
+        ];
     }
 
-    public static function inst()
+    private function formatTime(float $time): string
     {
-        if (!self::$miniTimer) {
-            self::$miniTimer = new miniTimer();
-        }
-
-        return self::$miniTimer;
-    }
-
-    private function formatTime($time)
-    {
-        if ($time > 1) {
-            return round($time, 3) . ' s';
-        } else {
-            return round($time * 1000) . ' ms';
-        }
+        return $time > 1 ? round($time, 3) . ' s' : round($time * 1000) . ' ms';
     }
 
     public function display($min = 0)
     {
-        echo '<style>
-                .minitimer_table { border-collapse:collapse; margin:20px 0; }
-                .minitimer_table td { padding: 7px 15px;  border:1px solid #ccc; }
-                .minitimer_table small { color: #666; }
-                .minitimer_table .time { text-align:right; }
-             </style>' .
-            '<table class="minitimer_table">' . $this->displayTimers($min) . $this->displayPoints($min) . '</table>';
+        echo self::CSS_STYLES . '<table class="minitimer_table">' . $this->displayTimers($min) . $this->displayPoints($min) . '</table>';
     }
 
     private function displayTimers($min = 0)
