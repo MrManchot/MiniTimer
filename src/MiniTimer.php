@@ -2,7 +2,6 @@
 
 class MiniTimer
 {
-
     private array $timers = [];
     private array $points = [];
     private const CSS_STYLES = '<style>
@@ -44,12 +43,12 @@ class MiniTimer
         return $time > 1 ? round($time, 3) . ' s' : round($time * 1000) . ' ms';
     }
 
-    public function display($min = 0)
+    public function display(float $min = 0): void
     {
         echo self::CSS_STYLES . '<table class="minitimer_table">' . $this->displayTimers($min) . $this->displayPoints($min) . '</table>';
     }
 
-    private function displayTimers($min = 0)
+    private function displayTimers(float $min = 0): string
     {
         if (empty($this->timers)) {
             return '';
@@ -68,19 +67,16 @@ class MiniTimer
         return $tableRow;
     }
 
-    private function displayPoints($min = 0)
+    private function displayPoints(float $min = 0): string
     {
         if (empty($this->points)) {
-            return false;
+            return '';
         }
 
-        $isFirst = true;
         $tableRow = '';
-        $last_point = array();
+        $last_point = null;
         foreach ($this->points as $point) {
-            if ($isFirst) {
-                $isFirst = false;
-            } else {
+            if ($last_point) {
                 $time = $point['time'] - $last_point['time'];
                 if ($time >= $min) {
                     $tableRow .= '<tr>
@@ -98,35 +94,23 @@ class MiniTimer
         return $tableRow;
     }
 
-    public function save()
+    public function save(): void
     {
         $dataToSave = [];
 
         // Sauvegarder les timers
         foreach ($this->timers as $key => $timer) {
-            $dataToSave['timers'][$key] = $this->formatTime($timer['time']);
-        }
-
-        // Sauvegarder les points de mesure
-        $last_point = null;
-        foreach ($this->points as $point) {
-            if ($last_point) {
-                $time = $point['time'] - $last_point['time'];
-                $dataToSave['points'][] = [
-                    'from' => $last_point['backtrace'][0]['file'] . ' line ' . $last_point['backtrace'][0]['line'],
-                    'to' => $point['backtrace'][0]['file'] . ' line ' . $point['backtrace'][0]['line'],
-                    'time' => $this->formatTime($time)
-                ];
-            }
-            $last_point = $point;
+            $dataToSave[] = [
+                'name' => $key,
+                'time' => $timer['time']
+            ];
         }
 
         // Écrire les données dans un fichier au format JSON
-        file_put_contents($this->logFile, json_encode($dataToSave, JSON_PRETTY_PRINT) . PHP_EOL, FILE_APPEND);
-
+        file_put_contents($this->logFile, json_encode($dataToSave) . PHP_EOL, FILE_APPEND);
     }
 
-    public function displayTotal()
+    public function displayTotal(): void
     {
         $mergedTimers = [];
 
@@ -148,7 +132,7 @@ class MiniTimer
         arsort($mergedTimers);
 
         // Afficher les résultats
-        echo self::CSS_STYLES . '<table class="minitimer_table">';;
+        echo self::CSS_STYLES . '<table class="minitimer_table">';
         foreach ($mergedTimers as $name => $time) {
             echo '<tr><td>' . $name . '</td><td>' . $this->formatTime($time) . '</td></tr>';
         }
