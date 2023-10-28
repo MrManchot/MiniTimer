@@ -11,6 +11,12 @@ class MiniTimer
         .minitimer_table small { color: #666; }
         .minitimer_table .time { text-align:right; }
     </style>';
+    private string $logFile;
+
+    public function __construct(string $logFile = 'timers.log')
+    {
+        $this->logFile = $logFile;
+    }
 
     public function start(string $key): void
     {
@@ -46,7 +52,7 @@ class MiniTimer
     private function displayTimers($min = 0)
     {
         if (empty($this->timers)) {
-            return false;
+            return '';
         }
 
         uasort($this->timers, function ($a, $b) {
@@ -90,5 +96,62 @@ class MiniTimer
         }
 
         return $tableRow;
+    }
+
+    public function save()
+    {
+        $dataToSave = [];
+
+        // Sauvegarder les timers
+        foreach ($this->timers as $key => $timer) {
+            $dataToSave['timers'][$key] = $this->formatTime($timer['time']);
+        }
+
+        // Sauvegarder les points de mesure
+        $last_point = null;
+        foreach ($this->points as $point) {
+            if ($last_point) {
+                $time = $point['time'] - $last_point['time'];
+                $dataToSave['points'][] = [
+                    'from' => $last_point['backtrace'][0]['file'] . ' line ' . $last_point['backtrace'][0]['line'],
+                    'to' => $point['backtrace'][0]['file'] . ' line ' . $point['backtrace'][0]['line'],
+                    'time' => $this->formatTime($time)
+                ];
+            }
+            $last_point = $point;
+        }
+
+        // Écrire les données dans un fichier au format JSON
+        file_put_contents($this->logFile, json_encode($dataToSave, JSON_PRETTY_PRINT) . PHP_EOL, FILE_APPEND);
+
+    }
+
+    public function displayTotal()
+    {
+        $mergedTimers = [];
+
+        // Lire le fichier de log
+        $lines = file($this->logFile, FILE_IGNORE_NEW_LINES);
+        foreach ($lines as $line) {
+            $timers = json_decode($line, true);
+            foreach ($timers as $timer) {
+                $name = $timer['name'];
+                $time = $timer['time'];
+                if (!isset($mergedTimers[$name])) {
+                    $mergedTimers[$name] = 0;
+                }
+                $mergedTimers[$name] += $time;
+            }
+        }
+
+        // Trier les timers du plus long au moins long
+        arsort($mergedTimers);
+
+        // Afficher les résultats
+        echo self::CSS_STYLES . '<table class="minitimer_table">';;
+        foreach ($mergedTimers as $name => $time) {
+            echo '<tr><td>' . $name . '</td><td>' . $this->formatTime($time) . '</td></tr>';
+        }
+        echo '</table>';
     }
 }
