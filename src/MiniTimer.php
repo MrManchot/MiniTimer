@@ -91,16 +91,38 @@ class MiniTimer
         echo '</table>';
     }
 
-    private function displayTask(string $key, int $level): void
+    private function sortChildrenByTime(array $children): array
+    {
+        usort($children, function ($a, $b) {
+            return $this->timers[$b]['time'] <=> $this->timers[$a]['time'];
+        });
+        return $children;
+    }
+
+
+    private function displayTask(string $key, int $level, ?float $parentTime = null): void
     {
         $timer = $this->timers[$key];
-        $indent = str_repeat('&nbsp;', $level * 4); // Indentation pour les sous-tâches
-        echo '<tr><td>' . $indent . $key . '</td><td class="time">' . $this->formatTime($timer['time']) . '</td></tr>';
+        $indent = str_repeat('---', $level).' '; // Indentation pour les sous-tâches
+        $timeFormatted = $this->formatTime($timer['time']);
+        $percentage = '';
 
-        foreach ($timer['children'] as $childKey) {
-            $this->displayTask($childKey, $level + 1); // Récursivement afficher les sous-tâches
+        if ($parentTime !== null) {
+            $percentage = ' (' . round(($timer['time'] / $parentTime) * 100) . '%)';
         }
+
+        echo '<tr><td>' . $indent . $key . '</td><td class="time">' . $timeFormatted . $percentage . '</td></tr>';
+
+        if (!empty($timer['children'])) {
+            // Tri des enfants par temps décroissant avant affichage
+            $sortedChildren = $this->sortChildrenByTime($timer['children']);
+            foreach ($sortedChildren as $childKey) {
+                $this->displayTask($childKey, $level + 1, $timer['time']);
+            }
+        }
+
     }
+
 
 
     public function save(): void
