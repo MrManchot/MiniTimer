@@ -2,8 +2,9 @@
 
 class MiniTimer
 {
+    private static $instance = null;
     private array $timers = [];
-    private array $points = [];
+    private array $taskStack = [];
     private const CSS_STYLES = '<style>
         .minitimer_table { border-collapse:collapse; margin:20px 0; }
         .minitimer_table td { padding: 7px 15px;  border:1px solid #ccc; }
@@ -12,22 +13,58 @@ class MiniTimer
     </style>';
     private string $logFile;
 
-    public function __construct(string $logFile = 'timers.log')
+    private function __construct(string $logFile = 'timers.log')
     {
         $this->logFile = $logFile;
     }
 
     public function start(string $key): void
     {
+        $startTime = microtime(true);
+        $parentKey = end($this->taskStack) ?: null; // Obtient la clé de la tâche parente si elle existe, sinon null
+        $this->taskStack[] = $key; // Ajoute la tâche actuelle à la pile
+
         if (!array_key_exists($key, $this->timers)) {
-            $this->timers[$key] = ['time' => 0];
+            $this->timers[$key] = ['time' => 0, 'start' => $startTime, 'parent' => $parentKey, 'children' => []];
+            if ($parentKey) {
+                $this->timers[$parentKey]['children'][] = $key; // Ajoute la tâche actuelle comme enfant de la tâche parente
+            }
+        } else {
+            // Si la tâche est déjà commencée, réinitialisez simplement son heure de début
+            $this->timers[$key]['start'] = $startTime;
         }
-        $this->timers[$key]['start'] = microtime(true);
+    }
+
+    // Méthode pour obtenir l'instance de la classe
+    public static function inst(string $logFile = 'timers.log'): self
+    {
+        if (self::$instance === null) {
+            self::$instance = new self($logFile);
+        }
+        return self::$instance;
+    }
+
+
+    // Empêcher le clonage de l'instance
+    private function __clone()
+    {
+    }
+
+    // Empêcher la désérialisation de l'instance
+    public function __wakeup()
+    {
+        throw new \Exception("Cannot unserialize a singleton.");
     }
 
     public function stop(string $key): void
     {
-        $this->timers[$key]['time'] += microtime(true) - $this->timers[$key]['start'];
+        if (!array_key_exists($key, $this->timers)) {
+            return; // Si la clé n'existe pas, ne fait rien
+        }
+
+        $endTime = microtime(true);
+        $this->timers[$key]['time'] += $endTime - $this->timers[$key]['start'];
+        array_pop($this->taskStack); // Retire la dernière tâche de la pile
     }
 
     public function addPoint(): void
@@ -45,54 +82,26 @@ class MiniTimer
 
     public function display(float $min = 0): void
     {
-        echo self::CSS_STYLES . '<table class="minitimer_table">' . $this->displayTimers($min) . $this->displayPoints($min) . '</table>';
-    }
-
-    private function displayTimers(float $min = 0): string
-    {
-        if (empty($this->timers)) {
-            return '';
-        }
-
-        uasort($this->timers, function ($a, $b) {
-            return $a['time'] < $b['time'];
-        });
-        $tableRow = '';
+        echo self::CSS_STYLES . '<table class="minitimer_table">';
         foreach ($this->timers as $key => $timer) {
-            if ($timer['time'] >= $min) {
-                $tableRow .= '<tr><td>' . $key . '</td><td class="time">' . self::formatTime($timer['time']) . '</td></tr>';
+            if ($timer['time'] >= $min && $timer['parent'] === null) { // Affiche seulement les tâches de niveau supérieur
+                $this->displayTask($key, 0);
             }
         }
-
-        return $tableRow;
+        echo '</table>';
     }
 
-    private function displayPoints(float $min = 0): string
+    private function displayTask(string $key, int $level): void
     {
-        if (empty($this->points)) {
-            return '';
-        }
+        $timer = $this->timers[$key];
+        $indent = str_repeat('&nbsp;', $level * 4); // Indentation pour les sous-tâches
+        echo '<tr><td>' . $indent . $key . '</td><td class="time">' . $this->formatTime($timer['time']) . '</td></tr>';
 
-        $tableRow = '';
-        $last_point = null;
-        foreach ($this->points as $point) {
-            if ($last_point) {
-                $time = $point['time'] - $last_point['time'];
-                if ($time >= $min) {
-                    $tableRow .= '<tr>
-                        <td>
-                            Between <small>' . $last_point['backtrace'][0]['file'] . '</small> line ' . $last_point['backtrace'][0]['line'] . '
-                            and <small>' . $point['backtrace'][0]['file'] . '</small> line ' . $point['backtrace'][0]['line'] . '
-                        </td>
-                        <td class="time">' . self::formatTime($time) . '</td>
-                    </tr>';
-                }
-            }
-            $last_point = $point;
+        foreach ($timer['children'] as $childKey) {
+            $this->displayTask($childKey, $level + 1); // Récursivement afficher les sous-tâches
         }
-
-        return $tableRow;
     }
+
 
     public function save(): void
     {
