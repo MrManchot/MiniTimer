@@ -38,4 +38,4 @@ To display the results of the measurements:
 
 ```php
 MiniTimer::inst()->display();
-`
+```
