@@ -12,6 +12,7 @@ class MiniTimer
         .minitimer_table .time { text-align:right; }
     </style>';
     private string $logFile;
+    private float $min_delay_display = 0;
 
     private function __construct(string $logFile = 'timers.log')
     {
@@ -21,21 +22,19 @@ class MiniTimer
     public function start(string $key): void
     {
         $startTime = microtime(true);
-        $parentKey = end($this->taskStack) ?: null; // Obtient la clé de la tâche parente si elle existe, sinon null
-        $this->taskStack[] = $key; // Ajoute la tâche actuelle à la pile
+        $parentKey = end($this->taskStack) ?: null;
+        $this->taskStack[] = $key;
 
         if (!array_key_exists($key, $this->timers)) {
             $this->timers[$key] = ['time' => 0, 'start' => $startTime, 'parent' => $parentKey, 'children' => []];
             if ($parentKey) {
-                $this->timers[$parentKey]['children'][] = $key; // Ajoute la tâche actuelle comme enfant de la tâche parente
+                $this->timers[$parentKey]['children'][] = $key;
             }
         } else {
-            // Si la tâche est déjà commencée, réinitialisez simplement son heure de début
             $this->timers[$key]['start'] = $startTime;
         }
     }
 
-    // Méthode pour obtenir l'instance de la classe
     public static function inst(string $logFile = 'timers.log'): self
     {
         if (self::$instance === null) {
@@ -44,47 +43,28 @@ class MiniTimer
         return self::$instance;
     }
 
-
-    // Empêcher le clonage de l'instance
-    private function __clone()
-    {
-    }
-
-    // Empêcher la désérialisation de l'instance
-    public function __wakeup()
-    {
-        throw new \Exception("Cannot unserialize a singleton.");
-    }
-
     public function stop(string $key): void
     {
         if (!array_key_exists($key, $this->timers)) {
-            return; // Si la clé n'existe pas, ne fait rien
+            return;
         }
 
         $endTime = microtime(true);
         $this->timers[$key]['time'] += $endTime - $this->timers[$key]['start'];
-        array_pop($this->taskStack); // Retire la dernière tâche de la pile
-    }
-
-    public function addPoint(): void
-    {
-        $this->points[] = [
-            'time' => microtime(true),
-            'backtrace' => debug_backtrace()
-        ];
+        array_pop($this->taskStack);
     }
 
     private function formatTime(float $time): string
     {
-        return $time > 1 ? round($time, 3) . ' s' : round($time * 1000) . ' ms';
+        return $time > 1 ? round($time, 1) . ' s' : round($time * 1000) . ' ms';
     }
 
     public function display(float $min = 0): void
     {
+        $this->min_delay_display = $min;
         echo self::CSS_STYLES . '<table class="minitimer_table">';
         foreach ($this->timers as $key => $timer) {
-            if ($timer['time'] >= $min && $timer['parent'] === null) { // Affiche seulement les tâches de niveau supérieur
+            if ($timer['parent'] === null) {
                 $this->displayTask($key, 0);
             }
         }
@@ -103,24 +83,24 @@ class MiniTimer
     private function displayTask(string $key, int $level, ?float $parentTime = null): void
     {
         $timer = $this->timers[$key];
-        $indent = str_repeat('---', $level).' '; // Indentation pour les sous-tâches
-        $timeFormatted = $this->formatTime($timer['time']);
-        $percentage = '';
+        if ($timer['time'] > $this->min_delay_display) {
+            $indent = str_repeat('»»» ', $level) . ' ';
+            $timeFormatted = $this->formatTime($timer['time']);
+            $percentage = '';
 
-        if ($parentTime !== null) {
-            $percentage = ' (' . round(($timer['time'] / $parentTime) * 100) . '%)';
-        }
+            if ($parentTime !== null) {
+                $percentage = ' <small>(' . round(($timer['time'] / $parentTime) * 100) . '%)</small>';
+            }
 
-        echo '<tr><td>' . $indent . $key . '</td><td class="time">' . $timeFormatted . $percentage . '</td></tr>';
+            echo '<tr><td>' . $indent . $key . '</td><td class="time">' . $timeFormatted . $percentage . '</td></tr>';
 
-        if (!empty($timer['children'])) {
-            // Tri des enfants par temps décroissant avant affichage
-            $sortedChildren = $this->sortChildrenByTime($timer['children']);
-            foreach ($sortedChildren as $childKey) {
-                $this->displayTask($childKey, $level + 1, $timer['time']);
+            if (!empty($timer['children'])) {
+                $sortedChildren = $this->sortChildrenByTime($timer['children']);
+                foreach ($sortedChildren as $childKey) {
+                    $this->displayTask($childKey, $level + 1, $timer['time']);
+                }
             }
         }
-
     }
 
 
@@ -129,7 +109,6 @@ class MiniTimer
     {
         $dataToSave = [];
 
-        // Sauvegarder les timers
         foreach ($this->timers as $key => $timer) {
             $dataToSave[] = [
                 'name' => $key,
@@ -137,7 +116,6 @@ class MiniTimer
             ];
         }
 
-        // Écrire les données dans un fichier au format JSON
         file_put_contents($this->logFile, json_encode($dataToSave) . PHP_EOL, FILE_APPEND);
     }
 
@@ -145,7 +123,6 @@ class MiniTimer
     {
         $mergedTimers = [];
 
-        // Lire le fichier de log
         $lines = file($this->logFile, FILE_IGNORE_NEW_LINES);
         foreach ($lines as $line) {
             $timers = json_decode($line, true);
@@ -159,10 +136,8 @@ class MiniTimer
             }
         }
 
-        // Trier les timers du plus long au moins long
         arsort($mergedTimers);
 
-        // Afficher les résultats
         echo self::CSS_STYLES . '<table class="minitimer_table">';
         foreach ($mergedTimers as $name => $time) {
             echo '<tr><td>' . $name . '</td><td>' . $this->formatTime($time) . '</td></tr>';
