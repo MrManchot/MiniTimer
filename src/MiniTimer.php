@@ -62,6 +62,11 @@ class MiniTimer
     public function display(float $min = 0): void
     {
         $this->min_delay_display = $min;
+
+        uasort($this->timers, function ($a, $b) {
+            return $b['time'] <=> $a['time'];
+        });
+        
         echo self::CSS_STYLES . '<table class="minitimer_table">';
         foreach ($this->timers as $key => $timer) {
             if ($timer['parent'] === null) {
